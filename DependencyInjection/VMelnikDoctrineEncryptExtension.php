@@ -26,6 +26,7 @@ class VMelnikDoctrineEncryptExtension extends Extension {
         $config = $this->processConfiguration($configuration, $configs);
         $services = array('orm' => 'orm-services');
         $supportedEncryptorClasses = array('aes256' => 'VMelnik\DoctrineEncryptBundle\Encryptors\AES256Encryptor');
+        $supportedEncryptorClasses = array('aes128mysql' => 'VMelnik\DoctrineEncryptBundle\Encryptors\AES128MysqlCompatibleEncryptor');
 
         if (empty($config['secret_key'])) {
             if ($container->hasParameter('secret')) {
