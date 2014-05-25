@@ -83,12 +83,10 @@ class DoctrineEncryptSubscriber implements EventSubscriber {
         foreach ($properties as $refProperty) {
             if ($this->annReader->getPropertyAnnotation($refProperty, self::ENCRYPTED_ANN_NAME)) {
                 $propName = $refProperty->getName();
-                $newValue = $this->encryptor->encrypt($args->getNewValue($propName));
 
-                // avoid exceptions when NULL or missing...
-                if(isset($newValue)) {
-                    $args->setNewValue($propName, $newValue);
-                }
+                try {
+                    $args->setNewValue($propName, $this->encryptor->encrypt($args->getNewValue($propName)));
+                } catch(\InvalidArgumentException $e) {     }
             }
         }
     }
