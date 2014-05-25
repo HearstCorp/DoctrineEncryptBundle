@@ -57,9 +57,14 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
      * {@inheritdoc}
      */
     public function decrypt($data) {
+        // skip if not string
+        if(!is_string($data)) {
+            return $data;
+        }
+
         $decodedData = base64_decode($data, true);
 
-        // do not decode if nothing to decode
+        // do not decode if broken or not base64
         if(false === $decodedData || base64_encode($decodedData) !== $data) {
             return $data;
         }
