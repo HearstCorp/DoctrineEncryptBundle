@@ -16,27 +16,29 @@ use Symfony\Component\DependencyInjection\Definition;
  *
  * To learn more see {@link http://symfony.com/doc/current/cookbook/bundles/extension.html}
  */
-class VMelnikDoctrineEncryptExtension extends Extension {
+class VMelnikDoctrineEncryptExtension extends Extension
+{
 
     /**
      * {@inheritDoc}
      */
-    public function load(array $configs, ContainerBuilder $container) {
+    public function load(array $configs, ContainerBuilder $container)
+    {
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
         $services = array('orm' => 'orm-services');
         $supportedEncryptorClasses = array('aes256' => 'VMelnik\DoctrineEncryptBundle\Encryptors\AES256Encryptor');
         $supportedEncryptorClasses = array('aes128mysql' => 'VMelnik\DoctrineEncryptBundle\Encryptors\AES128MysqlCompatibleEncryptor');
 
-        if (empty($config['secret_key'])) {
-            if ($container->hasParameter('secret')) {
+        if(empty($config['secret_key'])) {
+            if($container->hasParameter('secret')) {
                 $config['secret_key'] = $container->getParameter('secret');
             } else {
                 throw new \RuntimeException('You must provide "secret_key" for DoctrineEncryptBundle or "secret" for framework');
             }
         }
 
-        if (!empty($config['encryptor_class'])) {
+        if(!empty($config['encryptor_class'])) {
             $encryptorFullName = $config['encryptor_class'];
         } else {
             $encryptorFullName = $supportedEncryptorClasses[$config['encryptor']];
@@ -45,7 +47,7 @@ class VMelnikDoctrineEncryptExtension extends Extension {
         $container->setParameter('vmelnik_doctrine_encrypt.encryptor_class_name', $encryptorFullName);
         $container->setParameter('vmelnik_doctrine_encrypt.secret_key', $config['secret_key']);
 
-        if (!empty($config['encryptor_service'])) {
+        if(!empty($config['encryptor_service'])) {
             $container->setParameter('vmelnik_doctrine_encrypt.encryptor_service', $config['encryptor_service']);
         }
 
@@ -54,21 +56,23 @@ class VMelnikDoctrineEncryptExtension extends Extension {
     }
 
     /**
-     * 
+     *
      * @param ContainerBuilder $container
      * @param string $id
      * @return Definition
      * @throws \RuntimeException
      */
-    private function getDefinition(ContainerBuilder $container, $id) {
+    private function getDefinition(ContainerBuilder $container, $id)
+    {
         try {
             return $container->findDefinition($id);
-        } catch (InvalidArgumentException $e) {
-            throw new \RuntimeException('Unable to locate service (' . $id . ').', NULL, $e);
+        } catch(InvalidArgumentException $e) {
+            throw new \RuntimeException('Unable to locate service (' . $id . ').', null, $e);
         }
     }
 
-    public function getAlias() {
+    public function getAlias()
+    {
         return 'vmelnik_doctrine_encrypt';
     }
 

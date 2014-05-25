@@ -4,11 +4,11 @@ namespace VMelnik\DoctrineEncryptBundle\Encryptors;
 
 /**
  * Class for AES256 encryption
- * 
- * @author Victor Melnik <melnikvictorl@gmail.com>
+ *
  * @author AlexanderC <self@alexanderc.me>
  */
-class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
+class AES128MysqlCompatibleEncryptor implements EncryptorInterface
+{
 
     /**
      * @var string
@@ -23,7 +23,8 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
     /**
      * {@inheritdoc}
      */
-    public function __construct($key) {
+    public function __construct($key)
+    {
         $this->secretKey = $this->mysqlAesKey($key);
 
         $this->initializationVector = mcrypt_create_iv(
@@ -35,7 +36,8 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
     /**
      * {@inheritdoc}
      */
-    public function encrypt($data) {
+    public function encrypt($data)
+    {
         // skip if not string
         if(!is_string($data)) {
             return $data;
@@ -44,19 +46,22 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
         $pv = 16 - (strlen($data) % 16);
         $data = str_pad($data, (16 * (floor(strlen($data) / 16) + 1)), chr($pv));
 
-        return base64_encode(mcrypt_encrypt(
-            MCRYPT_RIJNDAEL_128,
-            $this->secretKey,
-            $data,
-            MCRYPT_MODE_ECB,
-            $this->initializationVector
-        ));
+        return base64_encode(
+            mcrypt_encrypt(
+                MCRYPT_RIJNDAEL_128,
+                $this->secretKey,
+                $data,
+                MCRYPT_MODE_ECB,
+                $this->initializationVector
+            )
+        );
     }
 
     /**
      * {@inheritdoc}
      */
-    public function decrypt($data) {
+    public function decrypt($data)
+    {
         // skip if not string
         if(!is_string($data)) {
             return $data;
@@ -69,13 +74,15 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
             return $data;
         }
 
-        return rtrim(mcrypt_decrypt(
-            MCRYPT_RIJNDAEL_128,
-            $this->secretKey,
-            $decodedData,
-            MCRYPT_MODE_ECB,
-            $this->initializationVector
-        ), "\0..\16");
+        return rtrim(
+            mcrypt_decrypt(
+                MCRYPT_RIJNDAEL_128,
+                $this->secretKey,
+                $decodedData,
+                MCRYPT_MODE_ECB,
+                $this->initializationVector
+            ), "\0..\16"
+        );
     }
 
     /**
