@@ -36,6 +36,11 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
      * {@inheritdoc}
      */
     public function encrypt($data) {
+        // skip if not string
+        if(!is_string($data)) {
+            return $data;
+        }
+
         $pv = 16 - (strlen($data) % 16);
         $data = str_pad($data, (16 * (floor(strlen($data) / 16) + 1)), chr($pv));
 
@@ -52,10 +57,17 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface {
      * {@inheritdoc}
      */
     public function decrypt($data) {
+        $decodedData = base64_decode($data, true);
+
+        // do not decode if nothing to decode
+        if(false === $decodedData || base64_encode($decodedData) !== $data) {
+            return $data;
+        }
+
         return rtrim(mcrypt_decrypt(
             MCRYPT_RIJNDAEL_128,
             $this->secretKey,
-            base64_decode($data),
+            $decodedData,
             MCRYPT_MODE_ECB,
             $this->initializationVector
         ), "\0..\16");
