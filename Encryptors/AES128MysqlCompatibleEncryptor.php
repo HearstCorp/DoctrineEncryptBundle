@@ -43,8 +43,8 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             return $data;
         }
 
-        $pv = 16 - (strlen($data) % 16);
-        $data = str_pad($data, (16 * (floor(strlen($data) / 16) + 1)), chr($pv));
+        //$pv = 16 - (strlen($data) % 16);
+        //$data = str_pad($data, (16 * (floor(strlen($data) / 16) + 1)), chr($pv));
 
         return base64_encode(
             mcrypt_encrypt(
