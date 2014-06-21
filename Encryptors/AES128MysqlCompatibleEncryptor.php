@@ -83,7 +83,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
     public function decrypt($data)
     {
         // skip if not string
-        if(!is_string($data) || !is_array($data)) {
+        if(!is_string($data) && !is_array($data)) {
             return $data;
         }
 
