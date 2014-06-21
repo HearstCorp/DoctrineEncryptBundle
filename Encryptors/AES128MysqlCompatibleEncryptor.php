@@ -39,13 +39,33 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
     public function encrypt($data)
     {
         // skip if not string
-        if(!is_string($data)) {
+        if(!is_string($data) && !is_array($data)) {
             return $data;
         }
 
+        // TODO: figure out why do we need this
         //$pv = 16 - (strlen($data) % 16);
         //$data = str_pad($data, (16 * (floor(strlen($data) / 16) + 1)), chr($pv));
 
+        if(is_array($data)) {
+            $encodedArray = [];
+
+            foreach($data as $key => $item) {
+                $encodedArray[$key] = $this->doEncrypt($item);
+            }
+
+            return $encodedArray;
+        }
+
+        return $this->doEncrypt($data);
+    }
+
+    /**
+     * @param string $data
+     * @return string
+     */
+    protected function doEncrypt($data)
+    {
         return base64_encode(
             mcrypt_encrypt(
                 MCRYPT_RIJNDAEL_128,
@@ -63,10 +83,29 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
     public function decrypt($data)
     {
         // skip if not string
-        if(!is_string($data)) {
+        if(!is_string($data) || !is_array($data)) {
             return $data;
         }
 
+        if(is_array($data)) {
+            $decodedArray = [];
+
+            foreach($data as $key => $item) {
+                $decodedArray[$key] = $this->doDecrypt($item);
+            }
+
+            return $decodedArray;
+        }
+
+        return $this->doDecrypt($data);
+    }
+
+    /**
+     * @param string $data
+     * @return string
+     */
+    protected function doDecrypt($data)
+    {
         $decodedData = base64_decode($data, true);
 
         // do not decode if broken or not base64
