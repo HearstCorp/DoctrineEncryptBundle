@@ -109,7 +109,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
         $decodedData = base64_decode($data, true);
 
         // do not decode if broken or not base64
-        if(false === $decodedData || base64_encode($decodedData) !== $data) {
+        if(false === $decodedData) {
             return $data;
         }
 
