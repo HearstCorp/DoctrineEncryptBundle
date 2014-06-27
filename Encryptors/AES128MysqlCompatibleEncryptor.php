@@ -43,10 +43,6 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             return $data;
         }
 
-        // TODO: figure out why do we need this
-        //$pv = 16 - (strlen($data) % 16);
-        //$data = str_pad($data, (16 * (floor(strlen($data) / 16) + 1)), chr($pv));
-
         if(is_array($data)) {
             $encodedArray = [];
 
@@ -113,14 +109,16 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             return $data;
         }
 
-        return rtrim(
+        return preg_replace(
+            '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u', 
+            '', 
             mcrypt_decrypt(
                 MCRYPT_RIJNDAEL_128,
                 $this->secretKey,
                 $decodedData,
                 MCRYPT_MODE_ECB,
                 $this->initializationVector
-            ), "\0..\16"
+            )
         );
     }
 
