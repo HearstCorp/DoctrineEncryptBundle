@@ -222,9 +222,12 @@ class DoctrineEncryptSubscriber implements EventSubscriber
      * @param Object $entity Some doctrine entity
      * @param \Doctrine\ORM\EntityManager $em
      * @return boolean
+     * @deprecated does not work properly
      */
     private function hasInDecodedRegistry($entity, EntityManager $em)
     {
+        return false;
+        
         $className = get_class($entity);
         $metadata = $em->getClassMetadata($className);
         $getter = 'get' . self::capitalize($metadata->getIdentifier());
@@ -236,9 +239,12 @@ class DoctrineEncryptSubscriber implements EventSubscriber
      * Adds entity to decoded registry
      * @param object $entity Some doctrine entity
      * @param \Doctrine\ORM\EntityManager $em
+     * @deprecated does not work properly
      */
     private function addToDecodedRegistry($entity, EntityManager $em)
     {
+        return;
+        
         $className = get_class($entity);
         $metadata = $em->getClassMetadata($className);
         $getter = 'get' . self::capitalize($metadata->getIdentifier());
