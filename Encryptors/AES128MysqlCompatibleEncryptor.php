@@ -109,16 +109,20 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             return $data;
         }
 
-        return preg_replace(
-            '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u', 
-            '', 
-            mcrypt_decrypt(
+        $decryptedData = mcrypt_decrypt(
                 MCRYPT_RIJNDAEL_128,
                 $this->secretKey,
                 $decodedData,
                 MCRYPT_MODE_ECB,
                 $this->initializationVector
-            )
+            );
+
+        $decryptedData = mb_convert_encoding($a, 'UTF-8', 'UTF-8');
+
+        return preg_replace(
+            '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u', 
+            '', 
+            $decryptedData
         );
     }
 
