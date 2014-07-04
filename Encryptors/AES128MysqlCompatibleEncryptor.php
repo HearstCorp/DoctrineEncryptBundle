@@ -119,11 +119,11 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
 
         $decryptedData = mb_convert_encoding($decryptedData, 'UTF-8', 'UTF-8');
 
-        return preg_replace(
+        return trim(preg_replace(
             '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u', 
             '', 
             $decryptedData
-        );
+        ));
     }
 
     /**
