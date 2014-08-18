@@ -109,7 +109,10 @@ class DoctrineEncryptSubscriber implements EventSubscriber
                 $propValue = $entity->$propName;
             } else {
                 $getter = 'get' . self::capitalize($propName);
-                $propValue = $entity->$getter();
+                
+                if(method_exists($entity, $getter)) {
+                    $propValue = $entity->$getter();
+                }
             }
 
             if($propValue instanceof Proxy) {
