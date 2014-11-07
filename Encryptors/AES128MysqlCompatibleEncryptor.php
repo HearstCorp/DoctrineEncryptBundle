@@ -52,6 +52,15 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
 
             return $encodedArray;
         }
+        
+        // check if data is already encrypted
+        if(is_string($data)) {
+            if($rawData = $this->doDecrypt($data)) {
+                if($data === $this->doEncrypt($rawData)) {
+                    return $data;
+                }
+            }
+        }
 
         return $this->doEncrypt($data);
     }
