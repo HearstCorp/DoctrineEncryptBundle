@@ -55,7 +55,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
         
         // check if data is already encrypted
         if(is_string($data)) {
-            if($rawData = $this->doDecrypt($data)) {
+            if($rawData = $this->doDecrypt($data) && $rawData !== $data) {
                 if($data === $this->doEncrypt($rawData)) {
                     return $data;
                 }
@@ -126,7 +126,8 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
                 $this->initializationVector
             );
 
-        $decryptedData = mb_convert_encoding($decryptedData, 'UTF-8', 'UTF-8');
+        // WTF is this shi*t???
+        //$decryptedData = mb_convert_encoding($decryptedData, 'UTF-8', 'UTF-8');
 
         return trim(preg_replace(
             '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u', 
