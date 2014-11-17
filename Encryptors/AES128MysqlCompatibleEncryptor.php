@@ -85,22 +85,25 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
      */
     public function isAlreadyEncrypted($data)
     {
-        $decodedData = base64_decode($data);
+        return false;
+        
+        // TODO: do we need this?
+        // $decodedData = base64_decode($data);
 
-        // do not decode if broken or not base64
-        if(false === $decodedData) {
-            return false;
-        }
+        // // do not decode if broken or not base64
+        // if(false === $decodedData) {
+        //     return false;
+        // }
 
-        $decryptedData = mcrypt_decrypt(
-            MCRYPT_RIJNDAEL_128,
-            $this->secretKey,
-            $decodedData,
-            MCRYPT_MODE_ECB,
-            $this->initializationVector
-        );
+        // $decryptedData = mcrypt_decrypt(
+        //     MCRYPT_RIJNDAEL_128,
+        //     $this->secretKey,
+        //     $decodedData,
+        //     MCRYPT_MODE_ECB,
+        //     $this->initializationVector
+        // );
 
-        return false !== $decryptedData && $data !== $decryptedData;
+        // return false !== $decryptedData && $data !== $decryptedData;
     }
 
     /**
