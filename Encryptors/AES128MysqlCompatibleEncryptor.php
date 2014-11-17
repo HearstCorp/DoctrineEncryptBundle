@@ -150,9 +150,6 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
      */
     protected function mysqlAesPrepareDecryptedValue($value)
     {
-        $value =  rtrim($value, "..16");
-
-        // TODO: do we need this?
         $value = preg_replace(
             '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u',
             '',
