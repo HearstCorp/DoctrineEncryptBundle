@@ -85,7 +85,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
      */
     public function isAlreadyEncrypted($data)
     {
-        $decodedData = base64_decode($data, true);
+        $decodedData = base64_decode($data);
 
         // do not decode if broken or not base64
         if(false === $decodedData) {
@@ -126,7 +126,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
      */
     protected function doDecrypt($data)
     {
-        $decodedData = base64_decode($data, true);
+        $decodedData = base64_decode($data);
 
         // do not decode if broken or not base64
         if(false === $decodedData) {
@@ -156,7 +156,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             $value
         );
 
-        return $value;
+        return trim($value);
     }
 
     /**
