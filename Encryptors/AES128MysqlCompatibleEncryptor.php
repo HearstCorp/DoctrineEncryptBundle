@@ -47,22 +47,13 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             $encodedArray = [];
 
             foreach($data as $key => $item) {
-                $encodedArray[$key] = $this->doEncrypt($item);
+                $encodedArray[$key] = $this->encrypt($item);
             }
 
             return $encodedArray;
         }
-        
-        // check if data is already encrypted
-        if(is_string($data)) {
-            if($rawData = $this->doDecrypt($data) && $rawData !== $data) {
-                if($data === $this->doEncrypt($rawData)) {
-                    return $data;
-                }
-            }
-        }
 
-        return $this->doEncrypt($data);
+        return $this->isAlreadyEncrypted($data) ? $data : $this->doEncrypt($data);
     }
 
     /**
@@ -83,6 +74,30 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
     }
 
     /**
+     * @param string $data
+     * @return bool
+     */
+    public function isAlreadyEncrypted($data)
+    {
+        $decodedData = base64_decode($data, true);
+
+        // do not decode if broken or not base64
+        if(false === $decodedData) {
+            return false;
+        }
+        
+        $decryptedData = mcrypt_decrypt(
+                MCRYPT_RIJNDAEL_128,
+                $this->secretKey,
+                $decodedData,
+                MCRYPT_MODE_ECB,
+                $this->initializationVector
+            );
+            
+        return false !== $decryptedData && $data !== $decryptedData;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function decrypt($data)
@@ -96,7 +111,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             $decodedArray = [];
 
             foreach($data as $key => $item) {
-                $decodedArray[$key] = $this->doDecrypt($item);
+                $decodedArray[$key] = $this->decrypt($item);
             }
 
             return $decodedArray;
