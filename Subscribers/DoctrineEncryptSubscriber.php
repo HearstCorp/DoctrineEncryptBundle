@@ -2,6 +2,7 @@
 
 namespace VMelnik\DoctrineEncryptBundle\Subscribers;
 
+use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\Common\EventSubscriber;
@@ -46,6 +47,11 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     private $preFlushEntities = [];
 
     /**
+     * @var array
+     */
+    private $postFlushEntities = [];
+
+    /**
      * Register to avoid multi decode operations for one entity
      *
      * @var array
@@ -80,6 +86,7 @@ class DoctrineEncryptSubscriber implements EventSubscriber
         $entity = $args->getEntity();
 
         unset($this->preFlushEntities[spl_object_hash($entity)]);
+        $this->postFlushEntities[spl_object_hash($entity)] = $entity;
         $this->processFields($entity);
     }
 
@@ -94,9 +101,23 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     {
         foreach ($this->preFlushEntities as $entity) {
             $this->processFields($entity);
+            $this->postFlushEntities[spl_object_hash($entity)] = $entity;
         }
 
         $this->preFlushEntities = [];
+    }
+
+    /**
+     * @param PostFlushEventArgs $args
+     */
+    public function postFlush(PostFlushEventArgs $args)
+    {
+        foreach ($this->postFlushEntities as $entity) {
+            $this->processFields($entity, false);
+            $this->preFlushEntities[spl_object_hash($entity)] = $entity;
+        }
+
+        $this->postFlushEntities = [];
     }
 
     /**
@@ -126,6 +147,7 @@ class DoctrineEncryptSubscriber implements EventSubscriber
             Events::prePersist,
             Events::preFlush,
             Events::postLoad,
+            Events::postFlush
         );
     }
 
