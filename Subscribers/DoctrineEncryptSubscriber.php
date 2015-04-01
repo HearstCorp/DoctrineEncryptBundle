@@ -79,6 +79,7 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     {
         $entity = $args->getEntity();
 
+        unset($this->preFlushEntities[spl_object_hash($entity)]);
         $this->processFields($entity);
     }
 
@@ -94,6 +95,8 @@ class DoctrineEncryptSubscriber implements EventSubscriber
         foreach ($this->preFlushEntities as $entity) {
             $this->processFields($entity);
         }
+
+        $this->preFlushEntities = [];
     }
 
     /**
