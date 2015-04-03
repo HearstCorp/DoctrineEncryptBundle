@@ -47,30 +47,13 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             $encodedArray = [];
 
             foreach($data as $key => $item) {
-                $encodedArray[$key] = $this->doEncrypt($item);
+                $encodedArray[$key] = $this->encrypt($item);
             }
 
             return $encodedArray;
         }
 
-        return $this->doEncrypt($data);
-    }
-
-    /**
-     * @param string $data
-     * @return string
-     */
-    protected function doEncrypt($data)
-    {
-        return base64_encode(
-            mcrypt_encrypt(
-                MCRYPT_RIJNDAEL_128,
-                $this->secretKey,
-                $data,
-                MCRYPT_MODE_ECB,
-                $this->initializationVector
-            )
-        );
+        return $this->isAlreadyEncrypted($data) ? $data : $this->doEncrypt($data);
     }
 
     /**
@@ -87,7 +70,7 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
             $decodedArray = [];
 
             foreach($data as $key => $item) {
-                $decodedArray[$key] = $this->doDecrypt($item);
+                $decodedArray[$key] = $this->decrypt($item);
             }
 
             return $decodedArray;
@@ -98,11 +81,55 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
 
     /**
      * @param string $data
+     * @return bool
+     */
+    public function isAlreadyEncrypted($data)
+    {
+        return false;
+        
+        // TODO: do we need this?
+        // $decodedData = base64_decode($data);
+
+        // // do not decode if broken or not base64
+        // if(false === $decodedData) {
+        //     return false;
+        // }
+
+        // $decryptedData = mcrypt_decrypt(
+        //     MCRYPT_RIJNDAEL_128,
+        //     $this->secretKey,
+        //     $decodedData,
+        //     MCRYPT_MODE_ECB,
+        //     $this->initializationVector
+        // );
+
+        // return false !== $decryptedData && $data !== $decryptedData;
+    }
+
+    /**
+     * @param string $data
+     * @return string
+     */
+    protected function doEncrypt($data)
+    {
+        return base64_encode(
+            mcrypt_encrypt(
+                MCRYPT_RIJNDAEL_128,
+                $this->secretKey,
+                $this->mysqlAesValue($data),
+                MCRYPT_MODE_ECB,
+                $this->initializationVector
+            )
+        );
+    }
+
+    /**
+     * @param string $data
      * @return string
      */
     protected function doDecrypt($data)
     {
-        $decodedData = base64_decode($data, true);
+        $decodedData = base64_decode($data);
 
         // do not decode if broken or not base64
         if(false === $decodedData) {
@@ -117,13 +144,33 @@ class AES128MysqlCompatibleEncryptor implements EncryptorInterface
                 $this->initializationVector
             );
 
-        $decryptedData = mb_convert_encoding($decryptedData, 'UTF-8', 'UTF-8');
+        return $this->mysqlAesPrepareDecryptedValue($decryptedData);
+    }
 
-        return trim(preg_replace(
-            '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u', 
-            '', 
-            $decryptedData
-        ));
+    /**
+     * @param string $value
+     * @return string
+     */
+    protected function mysqlAesPrepareDecryptedValue($value)
+    {
+        $value = preg_replace(
+            '/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/u',
+            '',
+            $value
+        );
+
+        return trim($value);
+    }
+
+    /**
+     * @param string $value
+     * @return string
+     */
+    protected function mysqlAesValue($value)
+    {
+        $padValue = 16 - (strlen($value) % 16);
+
+        return str_pad($value, (16 * (floor(strlen($value) / 16) + 1)), chr($padValue));
     }
 
     /**
