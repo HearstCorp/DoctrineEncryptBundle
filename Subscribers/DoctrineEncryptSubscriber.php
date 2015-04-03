@@ -11,7 +11,6 @@ use \Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Proxy\Proxy;
 use \ReflectionClass;
 use VMelnik\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
-use HRM\MainBundle\Entity\User;
 
 /**
  * Doctrine event subscriber which encrypt/decrypt entities
