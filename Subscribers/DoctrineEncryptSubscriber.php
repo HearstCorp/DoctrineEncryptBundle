@@ -2,6 +2,7 @@
 
 namespace VMelnik\DoctrineEncryptBundle\Subscribers;
 
+use Doctrine\Common\EventManager;
 use Doctrine\ORM\Events;
 use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\LifecycleEventArgs;
@@ -11,6 +12,7 @@ use \Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Proxy\Proxy;
 use \ReflectionClass;
 use VMelnik\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
+use HRM\MainBundle\Entity\User;
 
 /**
  * Doctrine event subscriber which encrypt/decrypt entities
@@ -46,6 +48,11 @@ class DoctrineEncryptSubscriber implements EventSubscriber
      * @var array
      */
     private $decodedRegistry = array();
+
+    /**
+     * @var array
+     */
+    private $elasticaSubscribers = null;
 
     /**
      * Initialization of subscriber
@@ -123,8 +130,42 @@ class DoctrineEncryptSubscriber implements EventSubscriber
         }
 
         $changeSet = $uow->getEntityChangeSet($entity);
+        $eventManager = $em->getEventManager();
         if ($this->changeSetBroken($changeSet)) {
             $uow->clearEntityChangeSet(spl_object_hash($entity));
+            $this->turnElasticaSubscribers('remove', $eventManager);
+        } else {
+            $this->turnElasticaSubscribers('add', $eventManager);
+        }
+    }
+
+    /**
+     * @param EventManager $eventManager
+     * @return array
+     */
+    private function getElasticaSubscribers(EventManager $eventManager)
+    {
+        if ($this->elasticaSubscribers !== null) {
+            return $this->elasticaSubscribers;
+        } else {
+            $this->elasticaSubscribers = [];
+            foreach($eventManager->getListeners() as $event => $subscribers) {
+                foreach($subscribers as $subscriber) {
+                    if ($subscriber instanceof \FOS\ElasticaBundle\Doctrine\Listener) {
+                        $this->elasticaSubscribers[] = $subscriber;
+                    }
+                }
+            }
+        }
+
+        return $this->elasticaSubscribers;
+    }
+
+    private function turnElasticaSubscribers($action, EventManager $eventManager)
+    {
+        $method = $action . 'EventSubscriber';
+        foreach ($this->getElasticaSubscribers($eventManager) as $subscriber) {
+            $eventManager->$method($subscriber);
         }
     }
 
