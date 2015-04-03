@@ -2,16 +2,16 @@
 
 namespace VMelnik\DoctrineEncryptBundle\Subscribers;
 
-use Doctrine\ORM\Event\PostFlushEventArgs;
-use Doctrine\ORM\Event\PreFlushEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\LifecycleEventArgs;
+use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\Common\Annotations\Reader;
 use \Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Proxy\Proxy;
 use \ReflectionClass;
 use VMelnik\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
+use HRM\MainBundle\Entity\User;
 
 /**
  * Doctrine event subscriber which encrypt/decrypt entities
@@ -40,16 +40,6 @@ class DoctrineEncryptSubscriber implements EventSubscriber
      * @var Doctrine\Common\Annotations\Reader
      */
     private $annReader;
-
-    /**
-     * @var array
-     */
-    private $preFlushEntities = [];
-
-    /**
-     * @var array
-     */
-    private $postFlushEntities = [];
 
     /**
      * Register to avoid multi decode operations for one entity
@@ -84,9 +74,6 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     public function prePersist(LifecycleEventArgs $args)
     {
         $entity = $args->getEntity();
-
-        unset($this->preFlushEntities[spl_object_hash($entity)]);
-        $this->postFlushEntities[spl_object_hash($entity)] = $entity;
         $this->processFields($entity);
     }
 
@@ -95,29 +82,66 @@ class DoctrineEncryptSubscriber implements EventSubscriber
      * which have @Encrypted annotation. Using changesets to avoid preUpdate event
      * restrictions
      *
-     * @param PreFlushEventArgs $args
+     * @param PreUpdateEventArgs $args
      */
-    public function preFlush(PreFlushEventArgs $args)
+    public function preUpdate(PreUpdateEventArgs $args)
     {
-        foreach ($this->preFlushEntities as $entity) {
-            $this->processFields($entity);
-            $this->postFlushEntities[spl_object_hash($entity)] = $entity;
+        $entity = $args->getEntity();
+        $em = $args->getEntityManager();
+        $uow = $em->getUnitOfWork();
+
+        $reflectionClass = new ReflectionClass(
+            $entity instanceof Proxy ? get_parent_class($entity) : get_class($entity)
+        );
+        $properties = $reflectionClass->getProperties();
+
+        foreach($properties as $refProperty) {
+            $propName = $refProperty->getName();
+
+            if($this->annReader->getPropertyAnnotation($refProperty, self::ENCRYPTED_ANN_NAME)
+                && $args->hasChangedField($propName)
+            ) {
+                $args->setNewValue($propName, $this->encryptor->encrypt($args->getNewValue($propName)));
+            }
+
+            // now compute change set for nested entities if possible
+            $propValue = null;
+
+            if($refProperty->isPublic()) {
+                $propValue = $entity->$propName;
+            } else {
+                $getter = 'get' . self::capitalize($propName);
+
+                if(method_exists($entity, $getter)) {
+                    $propValue = $entity->$getter();
+                }
+            }
+
+            if($propValue instanceof Proxy) {
+                $classMetadata = $em->getClassMetadata(get_class($propValue));
+                $uow->computeChangeSet($classMetadata, $propValue);
+            }
         }
 
-        $this->preFlushEntities = [];
+        $changeSet = $uow->getEntityChangeSet($entity);
+        if ($this->changeSetBroken($changeSet)) {
+            $uow->clearEntityChangeSet(spl_object_hash($entity));
+        }
     }
 
     /**
-     * @param PostFlushEventArgs $args
+     * @param $changeSet
+     * @return bool
      */
-    public function postFlush(PostFlushEventArgs $args)
+    private function changeSetBroken($changeSet)
     {
-        foreach ($this->postFlushEntities as $entity) {
-            $this->processFields($entity, false);
-            $this->preFlushEntities[spl_object_hash($entity)] = $entity;
+        foreach ($changeSet as $changes) {
+            if ($changes[0] != $changes[1]) {
+                return false;
+            }
         }
 
-        $this->postFlushEntities = [];
+        return true;
     }
 
     /**
@@ -128,10 +152,8 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     public function postLoad(LifecycleEventArgs $args)
     {
         $entity = $args->getEntity();
-
         if(!$this->hasInDecodedRegistry($entity, $args->getEntityManager())) {
             if($this->processFields($entity, false)) {
-                $this->preFlushEntities[spl_object_hash($entity)] = $entity;
                 $this->addToDecodedRegistry($entity, $args->getEntityManager());
             }
         }
@@ -145,9 +167,8 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     {
         return array(
             Events::prePersist,
-            Events::preFlush,
+            Events::preUpdate,
             Events::postLoad,
-            Events::postFlush
         );
     }
 
@@ -192,7 +213,6 @@ class DoctrineEncryptSubscriber implements EventSubscriber
                     $methodName = self::capitalize($propName);
                     if($reflectionClass->hasMethod($getter = 'get' . $methodName) && $reflectionClass->hasMethod($setter = 'set' . $methodName)) {
                         $currentPropValue = $this->encryptor->$encryptorMethod($entity->$getter());
-
                         $entity->$setter($currentPropValue);
                     } else {
                         throw new \RuntimeException(sprintf("Property %s isn't public and doesn't has getter/setter"));
