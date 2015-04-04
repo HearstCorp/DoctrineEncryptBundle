@@ -12,6 +12,7 @@ use \Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Proxy\Proxy;
 use \ReflectionClass;
 use VMelnik\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
+use HRM\MainBundle\Entity\User;
 
 /**
  * Doctrine event subscriber which encrypt/decrypt entities
@@ -52,6 +53,11 @@ class DoctrineEncryptSubscriber implements EventSubscriber
      * @var array
      */
     private $elasticaSubscribers = null;
+
+    /**
+     * @var bool
+     */
+    private $elasticaDown = false;
 
     /**
      * Initialization of subscriber
@@ -132,9 +138,24 @@ class DoctrineEncryptSubscriber implements EventSubscriber
         $eventManager = $em->getEventManager();
         if ($this->changeSetBroken($changeSet)) {
             $uow->clearEntityChangeSet(spl_object_hash($entity));
-            $this->turnElasticaSubscribers('remove', $eventManager);
-        } else {
+
+            if (!$this->elasticaDown) {
+                $this->turnElasticaSubscribers('remove', $eventManager);
+                $this->elasticaDown = true;
+            }
+        } elseif ($this->elasticaDown) {
             $this->turnElasticaSubscribers('add', $eventManager);
+            $this->elasticaDown = false;
+        }
+    }
+
+    /**
+     * @param LifecycleEventArgs $args
+     */
+    public function postUpdate(LifecycleEventArgs $args)
+    {
+        if ($this->elasticaDown) {
+            $this->turnElasticaSubscribers('add', $args->getEntityManager()->getEventManager());
         }
     }
 
@@ -208,6 +229,7 @@ class DoctrineEncryptSubscriber implements EventSubscriber
             Events::prePersist,
             Events::preUpdate,
             Events::postLoad,
+            Events::postUpdate
         );
     }
 
