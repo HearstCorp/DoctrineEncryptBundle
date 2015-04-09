@@ -156,6 +156,7 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     {
         if ($this->elasticaDown) {
             $this->turnElasticaSubscribers('add', $args->getEntityManager()->getEventManager());
+            $this->elasticaDown = false;
         }
     }
 
