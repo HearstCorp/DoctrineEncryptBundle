@@ -89,7 +89,7 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     }
 
     /**
-     * Listen a postPersist lifecycle event. Checking and decrypt entities 
+     * Listen a postPersist lifecycle event. Checking and decrypt entities
      * which have a @Encrypted annotation
      * @param LifecycleEventArgs $args
      */
@@ -167,6 +167,7 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     {
         if ($this->elasticaDown) {
             $this->turnElasticaSubscribers('add', $args->getEntityManager()->getEventManager());
+            $this->elasticaDown = false;
         }
     }
 
