@@ -12,6 +12,7 @@ use \Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Proxy\Proxy;
 use \ReflectionClass;
 use VMelnik\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
+use HRM\MainBundle\Entity\User;
 
 /**
  * Doctrine event subscriber which encrypt/decrypt entities
@@ -88,6 +89,17 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     }
 
     /**
+     * Listen a postPersist lifecycle event. Checking and decrypt entities 
+     * which have a @Encrypted annotation
+     * @param LifecycleEventArgs $args
+     */
+    public function postPersist(LifecycleEventArgs $args)
+    {
+        $entity = $args->getEntity();
+        $this->processFields($entity, false);
+    }
+
+    /**
      * Listen a preUpdate lifecycle event. Checking and encrypt entities fields
      * which have @Encrypted annotation. Using changesets to avoid preUpdate event
      * restrictions
@@ -155,7 +167,6 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     {
         if ($this->elasticaDown) {
             $this->turnElasticaSubscribers('add', $args->getEntityManager()->getEventManager());
-            $this->elasticaDown = false;
         }
     }
 
@@ -229,7 +240,8 @@ class DoctrineEncryptSubscriber implements EventSubscriber
             Events::prePersist,
             Events::preUpdate,
             Events::postLoad,
-            Events::postUpdate
+            Events::postUpdate,
+            Events::postPersist
         );
     }
 
