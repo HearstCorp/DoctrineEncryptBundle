@@ -2,16 +2,17 @@
 
 namespace VMelnik\DoctrineEncryptBundle\Subscribers;
 
-use Doctrine\ORM\Event\PostFlushEventArgs;
-use Doctrine\ORM\Event\PreFlushEventArgs;
+use Doctrine\Common\EventManager;
 use Doctrine\ORM\Events;
 use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\LifecycleEventArgs;
+use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\Common\Annotations\Reader;
 use \Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Proxy\Proxy;
 use \ReflectionClass;
 use VMelnik\DoctrineEncryptBundle\Encryptors\EncryptorInterface;
+use HRM\MainBundle\Entity\User;
 
 /**
  * Doctrine event subscriber which encrypt/decrypt entities
@@ -42,21 +43,21 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     private $annReader;
 
     /**
-     * @var array
-     */
-    private $preFlushEntities = [];
-
-    /**
-     * @var array
-     */
-    private $postFlushEntities = [];
-
-    /**
      * Register to avoid multi decode operations for one entity
      *
      * @var array
      */
     private $decodedRegistry = array();
+
+    /**
+     * @var array
+     */
+    private $elasticaSubscribers = null;
+
+    /**
+     * @var bool
+     */
+    private $elasticaDown = false;
 
     /**
      * Initialization of subscriber
@@ -84,10 +85,18 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     public function prePersist(LifecycleEventArgs $args)
     {
         $entity = $args->getEntity();
-
-        unset($this->preFlushEntities[spl_object_hash($entity)]);
-        $this->postFlushEntities[spl_object_hash($entity)] = $entity;
         $this->processFields($entity);
+    }
+
+    /**
+     * Listen a postPersist lifecycle event. Checking and decrypt entities
+     * which have a @Encrypted annotation
+     * @param LifecycleEventArgs $args
+     */
+    public function postPersist(LifecycleEventArgs $args)
+    {
+        $entity = $args->getEntity();
+        $this->processFields($entity, false);
     }
 
     /**
@@ -95,29 +104,116 @@ class DoctrineEncryptSubscriber implements EventSubscriber
      * which have @Encrypted annotation. Using changesets to avoid preUpdate event
      * restrictions
      *
-     * @param PreFlushEventArgs $args
+     * @param PreUpdateEventArgs $args
      */
-    public function preFlush(PreFlushEventArgs $args)
+    public function preUpdate(PreUpdateEventArgs $args)
     {
-        foreach ($this->preFlushEntities as $entity) {
-            $this->processFields($entity);
-            $this->postFlushEntities[spl_object_hash($entity)] = $entity;
+        $entity = $args->getEntity();
+        $em = $args->getEntityManager();
+        $uow = $em->getUnitOfWork();
+
+        $reflectionClass = new ReflectionClass(
+            $entity instanceof Proxy ? get_parent_class($entity) : get_class($entity)
+        );
+        $properties = $reflectionClass->getProperties();
+
+        foreach($properties as $refProperty) {
+            $propName = $refProperty->getName();
+
+            if($this->annReader->getPropertyAnnotation($refProperty, self::ENCRYPTED_ANN_NAME)
+                && $args->hasChangedField($propName)
+            ) {
+                $args->setNewValue($propName, $this->encryptor->encrypt($args->getNewValue($propName)));
+            }
+
+            // now compute change set for nested entities if possible
+            $propValue = null;
+
+            if($refProperty->isPublic()) {
+                $propValue = $entity->$propName;
+            } else {
+                $getter = 'get' . self::capitalize($propName);
+
+                if(method_exists($entity, $getter)) {
+                    $propValue = $entity->$getter();
+                }
+            }
+
+            if($propValue instanceof Proxy) {
+                $classMetadata = $em->getClassMetadata(get_class($propValue));
+                $uow->computeChangeSet($classMetadata, $propValue);
+            }
         }
 
-        $this->preFlushEntities = [];
+        $changeSet = $uow->getEntityChangeSet($entity);
+        $eventManager = $em->getEventManager();
+        if ($this->changeSetBroken($changeSet)) {
+            $uow->clearEntityChangeSet(spl_object_hash($entity));
+
+            if (!$this->elasticaDown) {
+                $this->turnElasticaSubscribers('remove', $eventManager);
+                $this->elasticaDown = true;
+            }
+        } elseif ($this->elasticaDown) {
+            $this->turnElasticaSubscribers('add', $eventManager);
+            $this->elasticaDown = false;
+        }
     }
 
     /**
-     * @param PostFlushEventArgs $args
+     * @param LifecycleEventArgs $args
      */
-    public function postFlush(PostFlushEventArgs $args)
+    public function postUpdate(LifecycleEventArgs $args)
     {
-        foreach ($this->postFlushEntities as $entity) {
-            $this->processFields($entity, false);
-            $this->preFlushEntities[spl_object_hash($entity)] = $entity;
+        if ($this->elasticaDown) {
+            $this->turnElasticaSubscribers('add', $args->getEntityManager()->getEventManager());
+            $this->elasticaDown = false;
+        }
+    }
+
+    /**
+     * @param EventManager $eventManager
+     * @return array
+     */
+    private function getElasticaSubscribers(EventManager $eventManager)
+    {
+        if ($this->elasticaSubscribers !== null) {
+            return $this->elasticaSubscribers;
+        } else {
+            $this->elasticaSubscribers = [];
+            foreach($eventManager->getListeners() as $event => $subscribers) {
+                foreach($subscribers as $subscriber) {
+                    if ($subscriber instanceof \FOS\ElasticaBundle\Doctrine\Listener) {
+                        $this->elasticaSubscribers[] = $subscriber;
+                    }
+                }
+            }
         }
 
-        $this->postFlushEntities = [];
+        return $this->elasticaSubscribers;
+    }
+
+    private function turnElasticaSubscribers($action, EventManager $eventManager)
+    {
+        $method = $action . 'EventSubscriber';
+        foreach ($this->getElasticaSubscribers($eventManager) as $subscriber) {
+            $eventManager->$method($subscriber);
+        }
+    }
+
+    /**
+     * @param $changeSet
+     * @return bool
+     */
+    private function changeSetBroken($changeSet)
+    {
+        foreach ($changeSet as $changes) {
+            if ($changes[0] != $changes[1]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -128,10 +224,8 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     public function postLoad(LifecycleEventArgs $args)
     {
         $entity = $args->getEntity();
-
         if(!$this->hasInDecodedRegistry($entity, $args->getEntityManager())) {
             if($this->processFields($entity, false)) {
-                $this->preFlushEntities[spl_object_hash($entity)] = $entity;
                 $this->addToDecodedRegistry($entity, $args->getEntityManager());
             }
         }
@@ -145,9 +239,10 @@ class DoctrineEncryptSubscriber implements EventSubscriber
     {
         return array(
             Events::prePersist,
-            Events::preFlush,
+            Events::preUpdate,
             Events::postLoad,
-            Events::postFlush
+            Events::postUpdate,
+            Events::postPersist
         );
     }
 
@@ -192,7 +287,6 @@ class DoctrineEncryptSubscriber implements EventSubscriber
                     $methodName = self::capitalize($propName);
                     if($reflectionClass->hasMethod($getter = 'get' . $methodName) && $reflectionClass->hasMethod($setter = 'set' . $methodName)) {
                         $currentPropValue = $this->encryptor->$encryptorMethod($entity->$getter());
-
                         $entity->$setter($currentPropValue);
                     } else {
                         throw new \RuntimeException(sprintf("Property %s isn't public and doesn't has getter/setter"));
